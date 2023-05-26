@@ -16,7 +16,7 @@ function getArrowPoints(
 
 	const compareLength = info.isStraight ? Vec2d.Dist(PB, PT) : Math.abs(info.bodyArc.length) // todo: arc length for curved arrows
 
-	const length = Math.max(Math.min(compareLength / 5, strokeWidth * 3), strokeWidth)
+	const length = Math.max(Math.min(compareLength / 5, strokeWidth * 15), strokeWidth) // changed 3 to 15 for xs
 
 	let P0: VecLike
 
