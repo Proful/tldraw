@@ -53,7 +53,7 @@ export function ToolbarSchemaProvider({ overrides, children }: TLUiToolbarSchema
 			toolbarItem(tools.eraser),
 			toolbarItem(tools.arrow),
 			toolbarItem(tools.text),
-			toolbarItem(tools.note),
+			toolbarItem(tools.laser),
 			toolbarItem(tools.asset),
 			toolbarItem(tools['rectangle']),
 			toolbarItem(tools['ellipse']),
@@ -75,7 +75,7 @@ export function ToolbarSchemaProvider({ overrides, children }: TLUiToolbarSchema
 			toolbarItem(tools.frame),
 			toolbarItem(tools.line),
 			highlighterEnabled ? toolbarItem(tools.highlight) : null,
-			toolbarItem(tools.laser),
+			toolbarItem(tools.note),
 		])
 
 		if (overrides) {
