@@ -19,3 +19,6 @@ apps/example/www/index.css
 
 bublic/packages/tldraw/ui.css
 bublic/packages/tldraw/editor.css
+apps/docs/
+**/tests/
+**/e2e/
