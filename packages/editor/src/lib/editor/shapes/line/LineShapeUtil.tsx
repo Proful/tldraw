@@ -38,7 +38,7 @@ export class LineShapeUtil extends ShapeUtil<TLLineShape> {
 	override getDefaultProps(): TLLineShape['props'] {
 		return {
 			dash: 'draw',
-			size: 'm',
+			size: 'xs',
 			color: 'black',
 			spline: 'line',
 			handles: {

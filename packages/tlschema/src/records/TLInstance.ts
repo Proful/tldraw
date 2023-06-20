@@ -356,4 +356,52 @@ export const instanceMigrations = defineMigrations({
 })
 
 /** @public */
+<<<<<<< HEAD
 export const TLINSTANCE_ID = 'instance:instance' as TLInstanceId
+=======
+export const InstanceRecordType = createRecordType<TLInstance>('instance', {
+	migrations: instanceMigrations,
+	validator: instanceTypeValidator,
+	scope: 'session',
+}).withDefaultProperties(
+	(): Omit<TLInstance, 'typeName' | 'id' | 'currentPageId'> => ({
+		followingUserId: null,
+		highlightedUserIds: [],
+		opacityForNextShape: 1,
+		propsForNextShape: {
+			color: 'black',
+			labelColor: 'black',
+			dash: 'draw',
+			fill: 'none',
+			size: 'xs',
+			icon: 'file',
+			font: 'draw',
+			align: 'middle',
+			verticalAlign: 'middle',
+			geo: 'rectangle',
+			arrowheadStart: 'none',
+			arrowheadEnd: 'arrow',
+			spline: 'line',
+		},
+		brush: null,
+		scribble: null,
+		cursor: {
+			type: 'default',
+			color: 'black',
+			rotation: 0,
+		},
+		isFocusMode: false,
+		exportBackground: false,
+		isDebugMode: process.env.NODE_ENV === 'development',
+		isToolLocked: false,
+		screenBounds: { x: 0, y: 0, w: 1080, h: 720 },
+		zoomBrush: null,
+		chatMessage: '',
+		isChatting: false,
+		isGridMode: false,
+		isPenMode: false,
+	})
+)
+
+/** @public */
+export const TLINSTANCE_ID = InstanceRecordType.createId('instance')

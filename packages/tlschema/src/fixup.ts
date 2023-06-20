@@ -210,7 +210,7 @@ export function fixupRecord(oldRecord: TLRecord) {
 					color: 'black',
 					dash: 'draw',
 					fill: 'none',
-					size: 'm',
+					size: 'xs',
 					icon: 'file',
 					font: 'draw',
 					align: 'middle',

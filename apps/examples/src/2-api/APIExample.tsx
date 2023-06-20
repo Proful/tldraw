@@ -37,7 +37,7 @@ export default function APIExample() {
 					h: 100,
 					dash: 'draw',
 					color: 'blue',
-					size: 'm',
+					size: 'xs',
 				},
 			},
 		])
