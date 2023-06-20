@@ -7,8 +7,9 @@ import { useEditor } from './useEditor'
 export function useDarkMode() {
 	const editor = useEditor()
 	const container = useContainer()
-	const isDarkMode = useValue('isDarkMode', () => editor.isDarkMode, [editor])
+	// const isDarkMode = useValue('isDarkMode', () => editor.isDarkMode, [editor])
 	const forceSrgb = useValue(debugFlags.forceSrgb)
+	const isDarkMode = true
 
 	React.useEffect(() => {
 		if (isDarkMode) {

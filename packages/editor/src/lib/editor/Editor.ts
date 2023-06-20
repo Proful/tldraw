@@ -643,6 +643,174 @@ export class Editor extends EventEmitter<TLEventMap> {
 		return shapeUtil as T
 	}
 
+	/* ---------------------- Props --------------------- */
+
+	/**
+	 * Get all the current styles among the users selected shapes
+	 *
+	 * @internal
+	 */
+	private _extractSharedStyles(shape: TLShape, sharedStyleMap: SharedStyleMap) {
+		if (this.isShapeOfType(shape, GroupShapeUtil)) {
+			// For groups, ignore the styles of the group shape and instead include the styles of the
+			// group's children. These are the shapes that would have their styles changed if the
+			// user called `setStyle` on the current selection.
+			const childIds = this._parentIdsToChildIds.value[shape.id]
+			if (!childIds) return
+
+			for (let i = 0, n = childIds.length; i < n; i++) {
+				this._extractSharedStyles(this.getShapeById(childIds[i][0])!, sharedStyleMap)
+			}
+		} else {
+			const util = this.getShapeUtil(shape)
+			for (const [style, value] of util.iterateStyles(shape)) {
+				sharedStyleMap.applyValue(style, value)
+			}
+		}
+	}
+
+	/**
+	 * A derived map containing all current styles among the user's selected shapes.
+	 *
+	 * @internal
+	 */
+	private _selectionSharedStyles = computed<ReadonlySharedStyleMap>(
+		'_selectionSharedStyles',
+		() => {
+			const { selectedShapes } = this
+
+			const sharedStyles = new SharedStyleMap()
+			for (const selectedShape of selectedShapes) {
+				this._extractSharedStyles(selectedShape, sharedStyles)
+			}
+
+			return sharedStyles
+		}
+	)
+
+	@computed private get _stylesForNextShape() {
+		return this.instanceState.stylesForNextShape
+	}
+
+	/** @internal */
+<<<<<<< HEAD
+	getStyleForNextShape<T>(style: StyleProp<T>): T {
+		const value = this._stylesForNextShape[style.id]
+		return value === undefined ? style.defaultValue : (value as T)
+=======
+	private _prevProps: any = {}
+
+	/**
+	 * A derived object containing either all current props among the user's selected shapes, or else
+	 * the user's most recent prop choices that correspond to the current active state (i.e. the
+	 * selected tool).
+	 *
+	 * @internal
+	 */
+	@computed get props(): TLNullableShapeProps | null {
+		let next: TLNullableShapeProps | null
+
+		// If we're in selecting and if we have a selection,
+		// return the shared props from the current selection
+		if (this.isIn('select') && this.selectedIds.length > 0) {
+			next = this._selectionSharedProps.value
+		} else {
+			// Otherwise, pull the style props from the app state
+			// (the most recent choices made by the user) that are
+			// exposed by the current state (i.e. the active tool).
+			const currentState = this.root.current.value!
+			if (currentState.styles.length === 0) {
+				next = null
+			} else {
+				const { propsForNextShape } = this.instanceState
+				next = Object.fromEntries(
+					currentState.styles.map((k) => {
+						return [k, propsForNextShape[k]]
+					})
+				)
+			}
+		}
+
+		// todo: any way to improve this? still faster than rendering the style panel every frame
+		if (JSON.stringify(this._prevProps) === JSON.stringify(next)) {
+			return this._prevProps
+		}
+
+		this._prevProps = next
+
+		return next
+	}
+
+	/**
+	 * A derived object containing either all current styles among the user's selected shapes, or
+	 * else the user's most recent style choices that correspond to the current active state (i.e.
+	 * the selected tool).
+	 *
+	 * @public
+	 */
+	@computed<ReadonlySharedStyleMap>({ isEqual: (a, b) => a.equals(b) })
+	get sharedStyles(): ReadonlySharedStyleMap {
+		// If we're in selecting and if we have a selection, return the shared styles from the
+		// current selection
+		if (this.isIn('select') && this.selectedIds.length > 0) {
+			return this._selectionSharedStyles.value
+		}
+
+		// If the current tool is associated with a shape, return the styles for that shape.
+		// Otherwise, just return an empty map.
+		const currentTool = this.root.current.value!
+		const styles = new SharedStyleMap()
+		if (currentTool.shapeType) {
+			for (const style of this.getShapeUtil(currentTool.shapeType).styleProps.keys()) {
+				styles.applyValue(style, this.getStyleForNextShape(style))
+			}
+		}
+
+		return styles
+	}
+
+	/**
+	 * Get the currently selected shared opacity.
+	 * If any shapes are selected, this returns the shared opacity of the selected shapes.
+	 * Otherwise, this returns the chosen opacity for the next shape.
+	 *
+	 * @public
+	 */
+	@computed get sharedOpacity(): SharedStyle<number> {
+		if (this.isIn('select') && this.selectedIds.length > 0) {
+			const shapesToCheck: TLShape[] = []
+			const addShape = (shapeId: TLShapeId) => {
+				const shape = this.getShapeById(shapeId)
+				if (!shape) return
+				// For groups, ignore the opacity of the group shape and instead include
+				// the opacity of the group's children. These are the shapes that would have
+				// their opacity changed if the user called `setOpacity` on the current selection.
+				if (this.isShapeOfType(shape, GroupShapeUtil)) {
+					for (const childId of this.getSortedChildIds(shape.id)) {
+						addShape(childId)
+					}
+				} else {
+					shapesToCheck.push(shape)
+				}
+			}
+			for (const shapeId of this.selectedIds) {
+				addShape(shapeId)
+			}
+
+			let opacity: number | null = null
+			for (const shape of shapesToCheck) {
+				if (opacity === null) {
+					opacity = shape.opacity
+				} else if (opacity !== shape.opacity) {
+					return { type: 'mixed' }
+				}
+			}
+
+			if (opacity !== null) return { type: 'shared', value: opacity }
+		}
+		return { type: 'shared', value: this.instanceState.opacityForNextShape }
+	}
+
 	/** @internal */
 	@computed
 	private get _arrowBindingsIndex() {
