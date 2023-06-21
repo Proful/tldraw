@@ -13,7 +13,7 @@ import { MenuZone } from './components/MenuZone'
 import { NavigationZone } from './components/NavigationZone/NavigationZone'
 import { ExitPenMode } from './components/PenModeToggle'
 import { StopFollowing } from './components/StopFollowing'
-import { StylePanel } from './components/StylePanel/StylePanel'
+import { StylePanelSN } from './components/StylePanel/StylePanelSN'
 import { ToastViewport, Toasts } from './components/Toasts'
 import { Toolbar } from './components/Toolbar/Toolbar'
 import { Button } from './components/primitives/Button'
@@ -121,21 +121,21 @@ const TldrawUiContent = React.memo(function TldrawUI({
 					</div>
 				) : (
 					<>
-						<div className="tlui-layout__top__sn">
-							<div className="tlui-layout__top__left">
+						<div className="tlui-layout__top">
+							<div className="tlui-layout__top__left sn-hide">
 								<MenuZone />
-								<div className="tlui-helper-buttons">
+								<div className="tlui-helper-buttons sn-hide">
 									<ExitPenMode />
 									<BackToContent />
 									<StopFollowing />
 								</div>
 							</div>
-							<div className="tlui-layout__top__center">{topZone}</div>
+							<div className="tlui-layout__top__center sn-hide">{topZone}</div>
 							<div className="tlui-layout__top__right">
 								{shareZone}
 								{breakpoint >= 5 && !isReadonlyMode && (
 									<div className="tlui-style-panel__wrapper">
-										<StylePanel />
+										<StylePanelSN />
 									</div>
 								)}
 							</div>
