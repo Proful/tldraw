@@ -643,131 +643,6 @@ export class Editor extends EventEmitter<TLEventMap> {
 		return shapeUtil as T
 	}
 
-	/* ---------------------- Props --------------------- */
-
-	/**
-	 * Get all the current styles among the users selected shapes
-	 *
-	 * @internal
-	 */
-	private _extractSharedStyles(shape: TLShape, sharedStyleMap: SharedStyleMap) {
-		if (this.isShapeOfType(shape, GroupShapeUtil)) {
-			// For groups, ignore the styles of the group shape and instead include the styles of the
-			// group's children. These are the shapes that would have their styles changed if the
-			// user called `setStyle` on the current selection.
-			const childIds = this._parentIdsToChildIds.value[shape.id]
-			if (!childIds) return
-
-			for (let i = 0, n = childIds.length; i < n; i++) {
-				this._extractSharedStyles(this.getShapeById(childIds[i][0])!, sharedStyleMap)
-			}
-		} else {
-			const util = this.getShapeUtil(shape)
-			for (const [style, value] of util.iterateStyles(shape)) {
-				sharedStyleMap.applyValue(style, value)
-			}
-		}
-	}
-
-	/**
-	 * A derived map containing all current styles among the user's selected shapes.
-	 *
-	 * @internal
-	 */
-	private _selectionSharedStyles = computed<ReadonlySharedStyleMap>(
-		'_selectionSharedStyles',
-		() => {
-			const { selectedShapes } = this
-
-			const sharedStyles = new SharedStyleMap()
-			for (const selectedShape of selectedShapes) {
-				this._extractSharedStyles(selectedShape, sharedStyles)
-			}
-
-			return sharedStyles
-		}
-	)
-
-	@computed private get _stylesForNextShape() {
-		return this.instanceState.stylesForNextShape
-	}
-
-	/** @internal */
-	getStyleForNextShape<T>(style: StyleProp<T>): T {
-		const value = this._stylesForNextShape[style.id]
-		return value === undefined ? style.defaultValue : (value as T)
-	}
-
-	/**
-	 * A derived object containing either all current styles among the user's selected shapes, or
-	 * else the user's most recent style choices that correspond to the current active state (i.e.
-	 * the selected tool).
-	 *
-	 * @public
-	 */
-	@computed<ReadonlySharedStyleMap>({ isEqual: (a, b) => a.equals(b) })
-	get sharedStyles(): ReadonlySharedStyleMap {
-		// If we're in selecting and if we have a selection, return the shared styles from the
-		// current selection
-		if (this.isIn('select') && this.selectedIds.length > 0) {
-			return this._selectionSharedStyles.value
-		}
-
-		// If the current tool is associated with a shape, return the styles for that shape.
-		// Otherwise, just return an empty map.
-		const currentTool = this.root.current.value!
-		const styles = new SharedStyleMap()
-		if (currentTool.shapeType) {
-			for (const style of this.getShapeUtil(currentTool.shapeType).styleProps.keys()) {
-				styles.applyValue(style, this.getStyleForNextShape(style))
-			}
-		}
-
-		return styles
-	}
-
-	/**
-	 * Get the currently selected shared opacity.
-	 * If any shapes are selected, this returns the shared opacity of the selected shapes.
-	 * Otherwise, this returns the chosen opacity for the next shape.
-	 *
-	 * @public
-	 */
-	@computed get sharedOpacity(): SharedStyle<number> {
-		if (this.isIn('select') && this.selectedIds.length > 0) {
-			const shapesToCheck: TLShape[] = []
-			const addShape = (shapeId: TLShapeId) => {
-				const shape = this.getShapeById(shapeId)
-				if (!shape) return
-				// For groups, ignore the opacity of the group shape and instead include
-				// the opacity of the group's children. These are the shapes that would have
-				// their opacity changed if the user called `setOpacity` on the current selection.
-				if (this.isShapeOfType(shape, GroupShapeUtil)) {
-					for (const childId of this.getSortedChildIds(shape.id)) {
-						addShape(childId)
-					}
-				} else {
-					shapesToCheck.push(shape)
-				}
-			}
-			for (const shapeId of this.selectedIds) {
-				addShape(shapeId)
-			}
-
-			let opacity: number | null = null
-			for (const shape of shapesToCheck) {
-				if (opacity === null) {
-					opacity = shape.opacity
-				} else if (opacity !== shape.opacity) {
-					return { type: 'mixed' }
-				}
-			}
-
-			if (opacity !== null) return { type: 'shared', value: opacity }
-		}
-		return { type: 'shared', value: this.instanceState.opacityForNextShape }
-	}
-
 	/** @internal */
 	@computed
 	private get _arrowBindingsIndex() {
@@ -5287,97 +5162,266 @@ export class Editor extends EventEmitter<TLEventMap> {
 	}
 
 	/**
-	 * The current page bounds of all the selected shapes (Not the same thing as the page bounds of
-	 * the selection bounding box when the selection has been rotated)
+	 * An array containing all of the shapes in the current page.
+	 *
+	 * @example
+	 * ```ts
+	 * editor.shapesArray
+	 * ```
 	 *
 	 * @readonly
 	 *
 	 * @public
 	 */
-	@computed get selectedPageBounds(): Box2d | null {
-		const {
-			pageState: { selectedIds },
-		} = this
-
-		if (selectedIds.length === 0) return null
-
-		return Box2d.Common(compact(selectedIds.map((id) => this.getPageBoundsById(id))))
+	@computed get shapesArray() {
+		return Array.from(this.currentPageShapeIds, (id) => this.store.get(id)! as TLShape)
 	}
 
 	/**
-	 * The rotation of the selection bounding box.
+	 * An array containing all of the shapes in the current page, sorted in z-index order (accounting
+	 * for nested shapes): e.g. A, B, BA, BB, C.
+	 *
+	 * @example
+	 * ```ts
+	 * editor.sortedShapesArray
+	 * ```
 	 *
 	 * @readonly
+	 *
 	 * @public
 	 */
-	@computed get selectionRotation(): number {
-		const { selectedIds } = this
-		if (selectedIds.length === 0) {
-			return 0
-		}
-		if (selectedIds.length === 1) {
-			return this.getPageRotationById(this.selectedIds[0])
+	@computed get sortedShapesArray(): TLShape[] {
+		const shapes = new Set(this.shapesArray.sort(sortByIndex))
+
+		const results: TLShape[] = []
+
+		function pushShapeWithDescendants(shape: TLShape): void {
+			results.push(shape)
+			shapes.delete(shape)
+
+			shapes.forEach((otherShape) => {
+				if (otherShape.parentId === shape.id) {
+					pushShapeWithDescendants(otherShape)
+				}
+			})
 		}
 
-		const allRotations = selectedIds.map((id) => this.getPageRotationById(id) % (Math.PI / 2))
-		// if the rotations are all compatible with each other, return the rotation of any one of them
-		if (allRotations.every((rotation) => Math.abs(rotation - allRotations[0]) < Math.PI / 180)) {
-			return this.getPageRotationById(selectedIds[0])
-		}
-		return 0
+		shapes.forEach((shape) => {
+			const parent = this.getShapeById(shape.parentId)
+			if (!isShape(parent)) {
+				pushShapeWithDescendants(shape)
+			}
+		})
+
+		return results
 	}
 
 	/**
-	 * The bounds of the selection bounding box.
+	 * Get whether a shape matches the type of a TLShapeUtil.
 	 *
-	 * @readonly
+	 * @example
+	 * ```ts
+	 * const isArrowShape = isShapeOfType(someShape, ArrowShapeUtil)
+	 * ```
+	 *
+	 * @param util - the TLShapeUtil constructor to test against
+	 * @param shape - the shape to test
+	 *
 	 * @public
 	 */
-	@computed get selectionBounds(): Box2d | undefined {
-		const { selectedIds } = this
+	isShapeOfType<T extends TLUnknownShape>(
+		shape: TLUnknownShape,
+		util: { new (...args: any): ShapeUtil<T>; type: string }
+	): shape is T {
+		return shape.type === util.type
+	}
 
-		if (selectedIds.length === 0) {
+	/**
+	 * Get a shape by its id.
+	 *
+	 * @example
+	 * ```ts
+	 * editor.getShapeById('box1')
+	 * ```
+	 *
+	 * @param id - The id of the shape to get.
+	 *
+	 * @public
+	 */
+	getShapeById<T extends TLShape = TLShape>(id: TLParentId): T | undefined {
+		if (!isShapeId(id)) return undefined
+		return this.store.get(id) as T
+	}
+
+	/**
+	 * Get the parent shape for a given shape. Returns undefined if the shape is the direct child of
+	 * the page.
+	 *
+	 * @example
+	 * ```ts
+	 * editor.getParentShape(myShape)
+	 * ```
+	 *
+	 * @public
+	 */
+	getParentShape(shape?: TLShape): TLShape | undefined {
+		if (shape === undefined || !isShapeId(shape.parentId)) return undefined
+		return this.store.get(shape.parentId)
+	}
+
+	/**
+	 * If siblingShape and targetShape are siblings, this returns targetShape. If targetShape has an
+	 * ancestor who is a sibling of siblingShape, this returns that ancestor. Otherwise, this returns
+	 * undefined.
+	 *
+	 * @internal
+	 */
+	private getShapeNearestSibling(
+		siblingShape: TLShape,
+		targetShape: TLShape | undefined
+	): TLShape | undefined {
+		if (!targetShape) {
 			return undefined
 		}
-
-		const { selectionRotation } = this
-		if (selectionRotation === 0) {
-			return this.selectedPageBounds!
+		if (targetShape.parentId === siblingShape.parentId) {
+			return targetShape
 		}
 
-		if (selectedIds.length === 1) {
-			const bounds = this.getBounds(this.getShapeById(selectedIds[0])!).clone()
-			bounds.point = Matrix2d.applyToPoint(this.getPageTransformById(selectedIds[0])!, bounds.point)
-			return bounds
-		}
+		const ancestor = this.findAncestor(
+			targetShape,
+			(ancestor) => ancestor.parentId === siblingShape.parentId
+		)
 
-		// need to 'un-rotate' all the outlines of the existing nodes so we can fit them inside a box
-		const allPoints = this.selectedIds
-			.flatMap((id) => {
-				const pageTransform = this.getPageTransformById(id)
-				if (!pageTransform) return []
-				return this.getOutlineById(id).map((point) => Matrix2d.applyToPoint(pageTransform, point))
-			})
-			.map((p) => Vec2d.Rot(p, -selectionRotation))
-		const box = Box2d.FromPoints(allPoints)
-		// now position box so that it's top-left corner is in the right place
-		box.point = box.point.rot(selectionRotation)
-		return box
+		return ancestor
 	}
 
 	/**
-	 * The center of the selection bounding box.
+	 * Get whether the given shape is the descendant of the given page.
 	 *
-	 * @readonly
+	 * @example
+	 * ```ts
+	 * editor.isShapeInPage(myShape)
+	 * editor.isShapeInPage(myShape, 'page1')
+	 * ```
+	 *
+	 * @param shape - The shape to check.
+	 * @param pageId - The id of the page to check against. Defaults to the current page.
+	 *
 	 * @public
 	 */
-	@computed get selectionPageCenter() {
-		const { selectionBounds, selectionRotation } = this
-		if (!selectionBounds) return null
-		return Vec2d.RotWith(selectionBounds.center, selectionBounds.point, selectionRotation)
+	isShapeInPage(shape: TLShape, pageId = this.currentPageId): boolean {
+		let shapeIsInPage = false
+
+		if (shape.parentId === pageId) {
+			shapeIsInPage = true
+		} else {
+			let parent = this.getShapeById(shape.parentId)
+			isInPageSearch: while (parent) {
+				if (parent.parentId === pageId) {
+					shapeIsInPage = true
+					break isInPageSearch
+				}
+				parent = this.getShapeById(parent.parentId)
+			}
+		}
+
+		return shapeIsInPage
 	}
 
-	/* ------------------- Statechart ------------------- */
+	/**
+	 * Get the id of the containing page for a given shape.
+	 *
+	 * @param shape - The shape to get the page id for.
+	 *
+	 * @returns The id of the page that contains the shape, or undefined if the shape is undefined.
+	 *
+	 * @public
+	 */
+	getAncestorPageId(shape?: TLShape): TLPageId | undefined {
+		if (shape === undefined) return undefined
+		if (isPageId(shape.parentId)) {
+			return shape.parentId
+		} else {
+			return this.getAncestorPageId(this.getShapeById(shape.parentId))
+		}
+	}
+
+	// Parents and children
+
+	/**
+	 * A cache of parents to children.
+	 *
+	 * @internal
+	 */
+	private readonly _parentIdsToChildIds: ReturnType<typeof parentsToChildrenWithIndexes>
+
+	/**
+	 * Reparent shapes to a new parent. This operation preserves the shape's current page positions /
+	 * rotations.
+	 *
+	 * @example
+	 * ```ts
+	 * editor.reparentShapesById(['box1', 'box2'], 'frame1')
+	 * ```
+	 *
+	 * @param ids - The ids of the shapes to reparent.
+	 * @param parentId - The id of the new parent shape.
+	 * @param insertIndex - The index to insert the children.
+	 *
+	 * @public
+	 */
+	reparentShapesById(ids: TLShapeId[], parentId: TLParentId, insertIndex?: string) {
+		const changes: TLShapePartial[] = []
+
+		const parentTransform = isPageId(parentId)
+			? Matrix2d.Identity()
+			: this.getPageTransformById(parentId)!
+
+		const parentPageRotation = parentTransform.decompose().rotation
+
+		let indices: string[] = []
+
+		const sibs = compact(this.getSortedChildIds(parentId).map((id) => this.getShapeById(id)))
+
+		if (insertIndex) {
+			const sibWithInsertIndex = sibs.find((s) => s.index === insertIndex)
+			if (sibWithInsertIndex) {
+				// If there's a sibling with the same index as the insert index...
+				const sibAbove = sibs[sibs.indexOf(sibWithInsertIndex) + 1]
+				if (sibAbove) {
+					// If the sibling has a sibling above it, insert the shapes
+					// between the sibling and its sibling above it.
+					indices = getIndicesBetween(insertIndex, sibAbove.index, ids.length)
+				} else {
+					// Or if the sibling is the top sibling, insert the shapes
+					// above the sibling
+					indices = getIndicesAbove(insertIndex, ids.length)
+				}
+			} else {
+				// If there's no collision, then we can start at the insert index
+				const sibAbove = sibs.sort(sortByIndex).find((s) => s.index > insertIndex)
+
+				if (sibAbove) {
+					// If the siblings include a sibling with a higher index, insert the shapes
+					// between the insert index and the sibling with the higher index.
+					indices = getIndicesBetween(insertIndex, sibAbove.index, ids.length)
+				} else {
+					// Otherwise, we're at the top of the order, so insert the shapes above
+					// the insert index.
+					indices = getIndicesAbove(insertIndex, ids.length)
+				}
+			}
+		} else {
+			// If insert index is not specified, start the index at the top.
+			const sib = sibs.length && sibs[sibs.length - 1]
+			indices = sib ? getIndicesAbove(sib.index, ids.length) : getIndices(ids.length)
+		}
+
+		let id: TLShapeId
+		for (let i = 0; i < ids.length; i++) {
+			id = ids[i]
+			const shape = this.getShapeById(id)
+			const pagePoint = this.getPagePointById(id)
 
 			if (!shape || !pagePoint) continue
 
