@@ -121,7 +121,7 @@ const TldrawUiContent = React.memo(function TldrawUI({
 					</div>
 				) : (
 					<>
-						<div className="tlui-layout__top">
+						<div className="tlui-layout__top__sn">
 							<div className="tlui-layout__top__left">
 								<MenuZone />
 								<div className="tlui-helper-buttons">
@@ -140,10 +140,14 @@ const TldrawUiContent = React.memo(function TldrawUI({
 								)}
 							</div>
 						</div>
+						<div className="tlui-layout__top">
+							<div className="tlui-layout__top__left">
+								<Toolbar />
+							</div>
+						</div>
 						<div className="tlui-layout__bottom">
 							<div className="tlui-layout__bottom__main">
 								<NavigationZone />
-								<Toolbar />
 								{breakpoint >= 4 && <HelpMenu />}
 							</div>
 							{isDebugMode && <DebugPanel renderDebugMenuItems={renderDebugMenuItems ?? null} />}

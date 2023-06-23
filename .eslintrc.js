@@ -36,7 +36,7 @@ module.exports = {
 		'no-throw-literal': 'error',
 		'react-hooks/rules-of-hooks': 'error',
 		'react-hooks/exhaustive-deps': 'error',
-		'import/no-extraneous-dependencies': 'error',
+		'import/no-extraneous-dependencies': 'off',
 		'import/no-internal-modules': ['error', { forbid: ['@tldraw/*/**'] }],
 		'@typescript-eslint/consistent-type-exports': [
 			'error',

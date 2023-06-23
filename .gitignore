@@ -80,3 +80,11 @@ apps/examples/build.esbuild.json
 
 apps/examples/e2e/test-results
 apps/examples/playwright-report
+apps/examples/playwright-report/index.html
+e2e/screenshots
+e2e/downloads
+e2e/driver-logs
+e2e/.wdio-vscode-service/
+
+apps/vscode/
+apps/sketchnotes/

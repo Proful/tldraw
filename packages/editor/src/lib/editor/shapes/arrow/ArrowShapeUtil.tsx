@@ -76,7 +76,7 @@ export class ArrowShapeUtil extends ShapeUtil<TLArrowShape> {
 	override getDefaultProps(): TLArrowShape['props'] {
 		return {
 			dash: 'draw',
-			size: 'm',
+			size: 'xs',
 			fill: 'none',
 			color: 'black',
 			labelColor: 'black',
