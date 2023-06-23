@@ -153,6 +153,14 @@ function CommonStylePickerSet({
 						onValueChange={handleValueChange}
 					/>
 				)}
+				<input
+					type="color"
+					value="#defdef"
+					onChange={(e) => {
+						handleValueChange(DefaultColorStyle, '#aefaef', false)
+					}}
+				/>
+
 				{opacity === undefined ? null : (
 					<Slider
 						data-testid="style.opacity"
